@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Baby Task Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f9; }
+        .navbar { background: #007bff; color: white; padding: 15px; }
+        .navbar a { color: white; margin: 0 10px; text-decoration: none; font-weight: bold; }
+        .container { padding: 20px; }
+        .card { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        Baby Task Manager
+        {% if session.get('user') %}
+            | <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            | <a href="{{ url_for('manage_tasks') }}">Tasks</a>
+            | <a href="{{ url_for('logout') }}">Logout ({{ session['user'] }})</a>
+        {% endif %}
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="color: red;">
+                    {% for msg in messages %} <p>{{ msg }}</p> {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
