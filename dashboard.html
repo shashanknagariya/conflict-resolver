@@ -1,12 +1,23 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="main.js"></script>
-</head>
-<body>
-    <h2>Welcome, {{ user }}!</h2>
-    <a href="{{ url_for('logout') }}">Logout</a>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="card">
+    <h3>Scores</h3>
+    {% for u, score in scores.items() %}
+        <p><b>{{ u }}</b>: {{ score }} points</p>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <h3>All Tasks</h3>
+    <ul>
+        {% for task in tasks %}
+            <li>
+                <b>{{ task.name }}</b> ({{ task.points }} pts, {{ task.type }}) -
+                Assigned to: {{ task.assigned_to }} |
+                Status: {{ task.status }}
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
