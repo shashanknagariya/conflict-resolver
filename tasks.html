@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Manage Tasks</h2>
+
+<div class="card">
+    <h3>Create Task</h3>
+    <form method="POST">
+        <input type="hidden" name="action" value="create">
+        Name: <input type="text" name="name" required>
+        Points: <input type="number" name="points" min="1" max="10" required>
+        Assign To:
+        <select name="assigned_to">
+            {% for u in users %}
+                <option value="{{ u }}">{{ u }}</option>
+            {% endfor %}
+        </select>
+        Type:
+        <select name="type">
+            <option value="daily">Daily</option>
+            <option value="onetime">One-time</option>
+        </select>
+        <button type="submit" class="btn-success">Add Task</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Existing Tasks</h3>
+    {% for task in tasks %}
+        <form method="POST" style="margin-bottom:10px;">
+            <b>{{ task.name }}</b> ({{ task.points }} pts, {{ task.type }}) - Assigned: {{ task.assigned_to }}
+            <br>Status:
+            <select name="status">
+                <option value="pending" {% if task.status=='pending' %}selected{% endif %}>Pending</option>
+                <option value="completed" {% if task.status=='completed' %}selected{% endif %}>Completed</option>
+            </select>
+            <input type="hidden" name="id" value="{{ task.id }}">
+            <button type="submit" name="action" value="update" class="btn-primary">Update</button>
+            <button type="submit" name="action" value="delete" class="btn-danger">Delete</button>
+        </form>
+    {% endfor %}
+</div>
+{% endblock %}
