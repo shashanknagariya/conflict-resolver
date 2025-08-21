@@ -1,42 +1,178 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Manage Tasks</h2>
-
-<div class="card">
-    <h3>Create Task</h3>
-    <form method="POST">
-        <input type="hidden" name="action" value="create">
-        Name: <input type="text" name="name" required>
-        Points: <input type="number" name="points" min="1" max="10" required>
-        Assign To:
-        <select name="assigned_to">
+<div class="row g-3">
+  <!-- Create Task -->
+  <div class="col-12">
+    <div class="card p-3">
+      <h5 class="mb-3">Create Task</h5>
+      <form id="createForm" class="row g-2">
+        <div class="col-12 col-md-4">
+          <input class="form-control" name="name" placeholder="Task name" required>
+        </div>
+        <div class="col-6 col-md-2">
+          <input type="number" class="form-control" name="points" min="1" max="10" value="5" required>
+        </div>
+        <div class="col-6 col-md-3">
+          <select class="form-select" name="assigned_to">
             {% for u in users %}
-                <option value="{{ u }}">{{ u }}</option>
+              <option value="{{ u }}">{{ u }}</option>
             {% endfor %}
-        </select>
-        Type:
-        <select name="type">
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <select class="form-select" name="type">
             <option value="daily">Daily</option>
             <option value="onetime">One-time</option>
-        </select>
-        <button type="submit" class="btn-success">Add Task</button>
-    </form>
+          </select>
+        </div>
+        <div class="col-6 col-md-1 d-grid">
+          <button class="btn btn-success">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Task List -->
+  <div class="col-12">
+    <div class="card p-3">
+      <h5 class="mb-3">All Tasks</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle" id="taskTable">
+          <thead>
+            <tr>
+              <th style="width:60px;">Done</th>
+              <th>Task</th>
+              <th>Points</th>
+              <th>Assigned To</th>
+              <th>Type</th>
+              <th style="width:60px;">Forward</th>
+              <th style="width:60px;">Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tasks %}
+            <tr data-id="{{ t.id }}" class="{% if t.status=='completed' %}table-success{% endif %}">
+              <td>
+                <input class="form-check-input status-toggle" type="checkbox" {% if t.status=='completed' %}checked{% endif %}>
+              </td>
+              <td class="task-name {% if t.status=='completed' %}text-decoration-line-through text-secondary{% endif %}">
+                {{ t.name }}
+              </td>
+              <td>{{ t.points }}</td>
+              <td class="assigned-cell">{{ t.assigned_to }}</td>
+              <td><span class="badge {% if t.type=='daily' %}bg-primary{% else %}bg-secondary{% endif %}">{{ t.type }}</span></td>
+              <td>
+                <button class="icon-btn forward-btn" title="Forward">
+                  <i class="fa-solid fa-share-from-square text-primary"></i>
+                </button>
+              </td>
+              <td>
+                <button class="icon-btn delete-btn" title="Delete">
+                  <i class="fa-solid fa-trash text-danger"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="text-secondary small">Tip: Toggle the checkbox to mark complete/pending. Click the share icon to forward. Trash icon deletes.</div>
+    </div>
+  </div>
 </div>
 
-<div class="card">
-    <h3>Existing Tasks</h3>
-    {% for task in tasks %}
-        <form method="POST" style="margin-bottom:10px;">
-            <b>{{ task.name }}</b> ({{ task.points }} pts, {{ task.type }}) - Assigned: {{ task.assigned_to }}
-            <br>Status:
-            <select name="status">
-                <option value="pending" {% if task.status=='pending' %}selected{% endif %}>Pending</option>
-                <option value="completed" {% if task.status=='completed' %}selected{% endif %}>Completed</option>
-            </select>
-            <input type="hidden" name="id" value="{{ task.id }}">
-            <button type="submit" name="action" value="update" class="btn-primary">Update</button>
-            <button type="submit" name="action" value="delete" class="btn-danger">Delete</button>
-        </form>
-    {% endfor %}
-</div>
+<script>
+  // --- Create Task (AJAX) ---
+  document.getElementById('createForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd.entries());
+    payload.points = parseInt(payload.points, 10);
+
+    const res = await fetch('/api/task/create', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert(data.error || 'Failed to create task');
+    }
+  });
+
+  // --- Toggle Status via checkbox ---
+  document.querySelectorAll('.status-toggle').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      const tr = e.target.closest('tr');
+      const taskId = parseInt(tr.dataset.id, 10);
+      const completed = e.target.checked;
+
+      const res = await fetch('/api/task/status', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ task_id: taskId, completed })
+      });
+      const data = await res.json();
+      if (data.success) {
+        tr.classList.toggle('table-success', completed);
+        const nameCell = tr.querySelector('.task-name');
+        if (completed) {
+          nameCell.classList.add('text-decoration-line-through','text-secondary');
+        } else {
+          nameCell.classList.remove('text-decoration-line-through','text-secondary');
+        }
+      } else {
+        alert(data.error || 'Failed to update status');
+        e.target.checked = !completed; // revert
+      }
+    });
+  });
+
+  // --- Delete Task via trash icon ---
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      const taskId = parseInt(tr.dataset.id, 10);
+      if (!confirm('Delete this task?')) return;
+      const res = await fetch('/api/task/delete', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ task_id: taskId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        tr.remove();
+      } else {
+        alert(data.error || 'Failed to delete task');
+      }
+    });
+  });
+
+  // --- Forward Task (prompt) ---
+  document.querySelectorAll('.forward-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      const taskId = parseInt(tr.dataset.id, 10);
+      const to = prompt("Forward to: husband / wife / unassigned", "husband");
+      if (!to) return;
+      if (!['husband','wife','unassigned'].includes(to)) {
+        alert('Invalid assignee.');
+        return;
+      }
+      const res = await fetch('/api/task/forward', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ task_id: taskId, new_assignee: to })
+      });
+      const data = await res.json();
+      if (data.success) {
+        tr.querySelector('.assigned-cell').textContent = to;
+      } else {
+        alert(data.error || 'Failed to forward task');
+      }
+    });
+  });
+</script>
 {% endblock %}
