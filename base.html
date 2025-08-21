@@ -25,6 +25,7 @@
       <div class="d-flex align-items-center">
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('manage_tasks') }}">Tasks</a>
+        <a href="{{ url_for('calendar') }}">Calendar</a>
         <span class="text-white-50 me-2">|</span>
         <span class="text-white-50 me-2">Hi, {{ session['username'] }}</span>
         <a class="btn btn-sm btn-light" href="{{ url_for('logout') }}">Logout</a>
