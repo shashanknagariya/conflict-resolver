@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, session, url_for, f
 import json, os, threading, time
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 app.secret_key = "baby_task_secret"
 
 USERS_FILE = "users.json"
