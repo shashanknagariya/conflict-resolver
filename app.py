@@ -8,6 +8,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "baby_task_secret_key_2024")
 
 USERS_FILE = "users.json"
 TASKS_FILE = "tasks.json"
+HISTORY_FILE = "history.json" 
 
 # ------------- Utils & Data Access -------------
 
@@ -78,6 +79,22 @@ def reset_daily_tasks():
 # Start background reset
 threading.Thread(target=reset_daily_tasks, daemon=True).start()
 
+@app.route('/calendar')
+def calendar():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('calendar.html')
+
+@app.route('/history/<date>')
+def history(date):
+    if 'username' not in session:
+        return jsonify([])
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as f:
+            history = json.load(f)
+        return jsonify(history.get(date, []))
+    return jsonify([])
+    
 # ------------- Auth -------------
 
 @app.route("/", methods=["GET", "POST"])
