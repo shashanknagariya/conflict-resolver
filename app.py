@@ -72,6 +72,15 @@ def dashboard():
     return render_template("dashboard.html", user=user, tasks=tasks, scores=scores)
 
 # ---------- Tasks ----------
+@app.route('/update_status/<int:task_id>', methods=['POST'])
+def update_status(task_id):
+    tasks = load_tasks()
+    data = request.get_json()
+    if 0 < task_id <= len(tasks):
+        tasks[task_id-1]['status'] = data['status']
+        save_tasks(tasks)
+    return jsonify(success=True)
+    
 @app.route("/tasks", methods=["GET", "POST"])
 def manage_tasks():
     if "user" not in session:
