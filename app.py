@@ -1,59 +1,121 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-import logging
-import os
+from flask import Flask, render_template, request, redirect, session, url_for, flash
+import json, os, threading, time
+from datetime import datetime
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+app = Flask(__name__)
+app.secret_key = "baby_task_secret"
 
-# Tell Flask to look for templates and static files in root dir
-app = Flask(__name__, template_folder=".", static_folder=".")
-app.secret_key = os.urandom(24)
+USERS_FILE = "users.json"
+TASKS_FILE = "tasks.json"
 
+# ---------- Helpers ----------
+def load_json(file):
+    if not os.path.exists(file):
+        return []
+    with open(file, "r") as f:
+        return json.load(f)
 
-@app.route("/")
-def home():
-    logging.debug("Home page accessed")
-    if "user" in session:
-        return redirect(url_for("dashboard"))
-    return redirect(url_for("login"))
+def save_json(file, data):
+    with open(file, "w") as f:
+        json.dump(data, f, indent=4)
 
+def reset_daily_tasks():
+    """Background job: Reset daily tasks at midnight."""
+    while True:
+        now = datetime.now()
+        if now.hour == 0 and now.minute == 0:  # At midnight
+            tasks = load_json(TASKS_FILE)
+            for t in tasks:
+                if t["type"] == "daily":
+                    t["status"] = "pending"
+                    t["done_by"] = None
+            save_json(TASKS_FILE, tasks)
+            print("✅ Daily tasks reset at midnight")
+            time.sleep(60)  # Prevent multiple resets
+        time.sleep(30)
 
-@app.route("/login", methods=["GET", "POST"])
+# ---------- Auth ----------
+@app.route("/", methods=["GET", "POST"])
 def login():
-    logging.debug("Login route accessed, method: %s", request.method)
-
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        logging.debug("Login attempt with username: %s", username)
+        username = request.form["username"]
+        password = request.form["password"]
 
-        if username == "admin" and password == "password":
-            session["user"] = username
-            logging.info("Login successful for user: %s", username)
-            return redirect(url_for("dashboard"))
-        else:
-            logging.warning("Invalid login attempt for user: %s", username)
-            return "Invalid Credentials", 401
-
+        users = load_json(USERS_FILE)
+        for user in users:
+            if user["username"] == username and user["password"] == password:
+                session["user"] = username
+                return redirect(url_for("dashboard"))
+        flash("Invalid credentials!")
     return render_template("login.html")
-
-
-@app.route("/dashboard")
-def dashboard():
-    logging.debug("Dashboard route accessed")
-    if "user" not in session:
-        logging.warning("Unauthorized dashboard access attempt")
-        return redirect(url_for("login"))
-    return render_template("dashboard.html", user=session["user"])
-
 
 @app.route("/logout")
 def logout():
-    user = session.pop("user", None)
-    logging.info("User logged out: %s", user)
+    session.clear()
     return redirect(url_for("login"))
 
+# ---------- Dashboard ----------
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    tasks = load_json(TASKS_FILE)
+    user = session["user"]
+
+    # Calculate scores
+    scores = {}
+    for t in tasks:
+        if t["status"] == "completed":
+            scores[t["done_by"]] = scores.get(t["done_by"], 0) + int(t["points"])
+
+    return render_template("dashboard.html", user=user, tasks=tasks, scores=scores)
+
+# ---------- Tasks ----------
+@app.route("/tasks", methods=["GET", "POST"])
+def manage_tasks():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    tasks = load_json(TASKS_FILE)
+    users = [u["username"] for u in load_json(USERS_FILE)]
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "create":
+            new_task = {
+                "id": str(len(tasks) + 1),
+                "name": request.form["name"],
+                "points": int(request.form["points"]),
+                "assigned_to": request.form["assigned_to"],
+                "type": request.form["type"],
+                "status": "pending",
+                "done_by": None
+            }
+            tasks.append(new_task)
+            save_json(TASKS_FILE, tasks)
+            flash("Task created successfully!")
+
+        elif action == "update":
+            task_id = request.form["id"]
+            for t in tasks:
+                if t["id"] == task_id:
+                    t["status"] = request.form["status"]
+                    t["done_by"] = session["user"] if t["status"] == "completed" else None
+            save_json(TASKS_FILE, tasks)
+            flash("Task updated!")
+
+        elif action == "delete":
+            task_id = request.form["id"]
+            tasks = [t for t in tasks if t["id"] != task_id]
+            save_json(TASKS_FILE, tasks)
+            flash("Task deleted!")
+
+    return render_template("tasks.html", tasks=tasks, users=users, user=session["user"])
+
+# ---------- Start Background Reset Thread ----------
+threading.Thread(target=reset_daily_tasks, daemon=True).start()
 
 if __name__ == "__main__":
-    logging.info("Starting Flask app")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host="0.0.0.0", port=10000, debug=True)
